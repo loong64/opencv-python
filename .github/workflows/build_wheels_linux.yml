@@ -33,6 +33,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   Build:
+    name: Build with_contrib ${{ matrix.with_contrib }} without_gui ${{ matrix.without_gui }}
     runs-on: ubuntu-22.04
     needs: Check
     if: needs.Check.outputs.build == '1'
@@ -68,11 +69,6 @@ jobs:
     - name: Cleanup
       run: find . -mindepth 1 -delete
       working-directory: ${{ github.workspace }}
-    - name: Setup environment
-      run: |
-        if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          echo "ENABLE_ROLLING=1" >> $GITHUB_ENV
-        fi
     - name: Checkout
       uses: actions/checkout@v3
       with:
@@ -80,6 +76,8 @@ jobs:
         ref: ${{ env.VERSION }}
         submodules: false
         fetch-depth: 0
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
     - name: Build a package
       run: source scripts/build.sh
     - name: Saving a wheel accordingly to matrix
