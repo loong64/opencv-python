@@ -1,0 +1,119 @@
+name: Linux loongarch64
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+
+jobs:
+  Check:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check_version.outputs.build }}
+      version: ${{ steps.check_version.outputs.version }}
+    steps:
+      - name: Check version
+        id: check_version
+        run: |
+          version=$(curl -s "https://api.github.com/repos/opencv/opencv-python/releases/latest" | jq -r .tag_name)
+          if [ -z "${version}" ] || [ "${version}" == "null" ]; then
+            echo "Failed to get version"
+            exit 1
+          fi
+
+          echo "version=${version}" >> $GITHUB_ENV
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "========== Build Args =========="
+          echo "opencv-python version: ${version}"
+
+          gh release view ${version} -R ${{ github.repository }} | grep opencv.*.whl >/dev/null 2>&1 || echo "build=1" >> $GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  Build:
+    runs-on: ubuntu-22.04
+    needs: Check
+    if: needs.Check.outputs.build == '1'
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        platform: [x64]
+        with_contrib: [0, 1]
+        without_gui: [0, 1]
+        build_sdist: [0]
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      REPO_DIR: .
+      PROJECT_SPEC: opencv-python
+      MB_PYTHON_VERSION: ${{ matrix.python-version }}
+      TRAVIS_PYTHON_VERSION: ${{ matrix.python-version }}
+      MB_ML_VER: _2_38
+      TRAVIS_BUILD_DIR: ${{ github.workspace }}
+      CONFIG_PATH: travis_config.sh
+      DOCKER_IMAGE: ghcr.io/loong64/opencv-python-manylinux_2_38-loongarch64:latest
+      USE_CCACHE: 0
+      UNICODE_WIDTH: 32
+      PLAT: loongarch64
+      SDIST: ${{ matrix.build_sdist || 0 }}
+      ENABLE_HEADLESS: ${{ matrix.without_gui }}
+      ENABLE_CONTRIB: ${{ matrix.with_contrib }}
+      VERSION: ${{ needs.Check.outputs.version }}
+    steps:
+    - name: Cleanup
+      run: find . -mindepth 1 -delete
+      working-directory: ${{ github.workspace }}
+    - name: Setup environment
+      run: |
+        if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "ENABLE_ROLLING=1" >> $GITHUB_ENV
+        fi
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: opencv/opencv-python
+        ref: ${{ env.VERSION }}
+        submodules: false
+        fetch-depth: 0
+    - name: Build a package
+      run: source scripts/build.sh
+    - name: Saving a wheel accordingly to matrix
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-${{ matrix.with_contrib }}-${{ matrix.without_gui }}-${{ matrix.build_sdist }}
+        path: wheelhouse/opencv*.whl
+
+  Release:
+    runs-on: ubuntu-22.04
+    needs: [Check, Build]
+    if: needs.Check.outputs.build == '1'
+    env:
+      VERSION: ${{ needs.Check.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels
+          path: wheelhouse/
+      - name: Upload wheels
+        run: |
+          pip install twine==6.0.1
+          for file in wheelhouse/*.whl; do
+            twine upload --repository-url https://gitlab.com/api/v4/projects/65746188/packages/pypi $file || true
+          done
+        env:
+          TWINE_USERNAME: ${{ github.repository_owner }}
+          TWINE_PASSWORD: ${{ secrets.GL_TOKEN }}
+
+      - name: Upload release
+        run: |
+          gh release upload ${{ env.VERSION }} -R ${{ github.repository }} wheelhouse/*.whl --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

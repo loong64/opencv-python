@@ -6,7 +6,8 @@ on:
     - cron: 0 0 * * *
 
 jobs:
-  build:
+  build_loongarch64_wheels:
+    name: Build image for loongarch64
     runs-on: ubuntu-latest
     steps:
       - name: Check version
@@ -39,12 +40,10 @@ jobs:
         if: env.build == '1'
         run: |
           mkdir -p docker/manylinux_2_38
+          wget -qO docker/manylinux_2_38/Dockerfile_loongarch64 https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_x86_64
+          patch -p1 < loong64.patch
           cd docker/manylinux_2_38
-          wget -qO Dockerfile_loongarch64 https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_aarch64
-          sed -i "s@quay.io/opencv-ci/opencv-python-manylinux2014-aarch64@ghcr.io/loong64/manylinux_2_38_loongarch64@g" Dockerfile_loongarch64
-          sed -i "s@cp /usr/include/lapacke@# cp /usr/include/lapacke@g" Dockerfile_loongarch64
-          sed -i 's/epel-release//g' Dockerfile_loongarch64
-
+          sed -i "s@FROM quay.io/pypa/manylinux2014_x86_64@FROM ghcr.io/loong64/manylinux_2_38_loongarch64@g" Dockerfile_loongarch64
           image_tag=$(cat Dockerfile_loongarch64 | grep "Version:" | sed 's/# Version: //')
           echo "image_tag=${image_tag}" >> $GITHUB_ENV
 
@@ -59,7 +58,8 @@ jobs:
         if: env.build == '1'
         uses: docker/build-push-action@v6
         with:
-          context: docker/manylinux_2_38
+          context: .
+          file: docker/manylinux_2_38/Dockerfile_loongarch64
           platforms: linux/loong64
           push: true
           tags: |

@@ -1,0 +1,61 @@
+diff --git a/docker/manylinux_2_38/Dockerfile_loongarch64 b/docker/manylinux_2_38/Dockerfile_loongarch64
+index 3ed3aa4..783ee6a 100644
+--- a/docker/manylinux_2_38/Dockerfile_loongarch64
++++ b/docker/manylinux_2_38/Dockerfile_loongarch64
+@@ -18,10 +18,11 @@ ARG AVIF_VERSION=v1.3.0
+ ENV LD_LIBRARY_PATH /usr/local/lib:$LD_LIBRARY_PATH
+ 
+ # epel-release need for aarch64 to get openblas packages
+-RUN yum install zlib-devel curl-devel xcb-util-renderutil-devel xcb-util-devel xcb-util-image-devel xcb-util-keysyms-devel xcb-util-wm-devel mesa-libGL-devel libxkbcommon-devel libxkbcommon-x11-devel libXi-devel lapack-devel epel-release -y && \
++RUN yum install zlib-devel curl-devel xcb-util-renderutil-devel xcb-util-devel xcb-util-image-devel xcb-util-keysyms-devel xcb-util-wm-devel mesa-libGL-devel libxkbcommon-devel libxkbcommon-x11-devel libXi-devel lapack-devel perl-lib -y && \
+     yum install openblas-devel dejavu-sans-fonts -y && \
+     cp /usr/include/openblas/*.h /usr/include/ && \
+-    cp /usr/include/lapacke/lapacke*.h /usr/include/ && \
++    # cp /usr/include/lapacke/lapacke*.h /usr/include/ && \
++    cp -R /usr/share/fonts/dejavu-sans-fonts /usr/share/fonts/dejavu && \
+     # libpng will be built from source
+     yum remove libpng -y
+ 
+@@ -50,6 +51,7 @@ RUN mkdir ~/freetype_sources && \
+ RUN curl -O -L https://download.qt.io/archive/qt/5.15/${QT_VERSION}/single/qt-everywhere-opensource-src-${QT_VERSION}.tar.xz && \
+     tar -xf qt-everywhere-opensource-src-${QT_VERSION}.tar.xz && \
+     cd qt-everywhere-src-${QT_VERSION} && \
++    sed -i 's/defined(__mips__) || /defined(__mips__) || defined(__loongarch__) || /g' qtbase/src/3rdparty/double-conversion/include/double-conversion/utils.h && \
+     export MAKEFLAGS=-j$(nproc) && \
+     ./configure -prefix /opt/Qt${QT_VERSION} -release -opensource -confirm-license -qtnamespace QtOpenCVPython -xcb -xcb-xlib -bundled-xcb-xinput -no-openssl -no-dbus -skip qt3d -skip qtactiveqt -skip qtcanvas3d -skip qtconnectivity -skip qtdatavis3d -skip qtdoc -skip qtgamepad -skip qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtmultimedia -skip qtpurchasing -skip qtqa -skip qtremoteobjects -skip qtrepotools -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech -skip qttranslations -skip qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebsockets -skip qtwebview -skip xmlpatterns -skip declarative -make libs && \
+     make && \
+@@ -87,6 +89,8 @@ RUN mkdir ~/yasm_sources && \
+     curl -O -L http://www.tortall.net/projects/yasm/releases/yasm-${YASM_VERSION}.tar.gz && \
+     tar -xf yasm-${YASM_VERSION}.tar.gz && \
+     cd yasm-${YASM_VERSION} && \
++    curl -o config/config.sub -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.sub && \
++    curl -o config/config.guess -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.guess && \
+     ./configure --prefix="/ffmpeg_build" --bindir="$HOME/bin" && \
+     make -j$(getconf _NPROCESSORS_ONLN) && \
+     make install && \
+@@ -97,6 +101,8 @@ RUN mkdir ~/libvpx_sources && \
+     cd ~/libvpx_sources && \
+     git clone --depth 1 -b ${VPX_VERSION} https://chromium.googlesource.com/webm/libvpx.git && \
+     cd libvpx && \
++    curl -L https://github.com/webmproject/libvpx/commit/a7863b9a2f01e5d22919a51c95cbc4a9c10fbb2c.patch | patch -p1 && \
++    curl -L https://github.com/webmproject/libvpx/commit/a604e10afbb2e711e62d8d9ca9c64b368e30b0e2.patch | patch -p1 && \
+     ./configure --prefix="/ffmpeg_build" --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --as=yasm --enable-pic --enable-shared && \
+     make -j$(getconf _NPROCESSORS_ONLN) && \
+     make install && \
+@@ -137,6 +143,8 @@ RUN mkdir ~/ffmpeg_sources && \
+ RUN curl -O -L https://github.com/ccache/ccache/releases/download/v${CCACHE_VERSION}/ccache-${CCACHE_VERSION}.tar.gz && \
+     tar -xf ccache-${CCACHE_VERSION}.tar.gz && \
+     cd ccache-${CCACHE_VERSION} && \
++    curl -O -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.sub && \
++    curl -O -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.guess && \
+     ./configure && \
+     make -j$(getconf _NPROCESSORS_ONLN) && \
+     make install && \
+@@ -157,6 +165,7 @@ USER ci
+ # Git security vulnerability: https://github.blog/2022-04-12-git-security-vulnerability-announced
+ RUN git config --global --add safe.directory /io
+ 
++ENV PIP_EXTRA_INDEX_URL https://gitlab.com/api/v4/projects/65746188/packages/pypi/simple
+ ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig:/ffmpeg_build/lib/pkgconfig
+ ENV LDFLAGS -L/ffmpeg_build/lib
+ ENV PATH "$HOME/bin:$PATH"
