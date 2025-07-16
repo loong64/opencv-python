@@ -1,0 +1,307 @@
+name: Custom build wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Build with specific tag'
+        required: true
+        default: ''
+      image_version:
+        description: 'Use opencv-python-manylinux image version'
+        required: true
+        default: '20250630'
+
+jobs:
+  build_aarch64_wheels:
+    name: Build aarch64 with_contrib ${{ matrix.with_contrib }} without_gui ${{ matrix.without_gui }}
+    runs-on: ubuntu-22.04-arm
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        platform: [x64]
+        with_contrib: [0, 1]
+        without_gui: [0, 1]
+        build_sdist: [0]
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      REPO_DIR: .
+      PROJECT_SPEC: opencv-python
+      MB_PYTHON_VERSION: ${{ matrix.python-version }}
+      TRAVIS_PYTHON_VERSION: ${{ matrix.python-version }}
+      MB_ML_VER: 2014
+      TRAVIS_BUILD_DIR: ${{ github.workspace }}
+      CONFIG_PATH: travis_config.sh
+      DOCKER_IMAGE: quay.io/opencv-ci/opencv-python-manylinux2014-aarch64:${{ github.event.inputs.image_version }}
+      USE_CCACHE: 0
+      UNICODE_WIDTH: 32
+      PLAT: aarch64
+      SDIST: ${{ matrix.build_sdist || 0 }}
+      ENABLE_HEADLESS: ${{ matrix.without_gui }}
+      ENABLE_CONTRIB: ${{ matrix.with_contrib }}
+      VERSION: ${{ github.event.inputs.tag }}
+    steps:
+    - name: Cleanup
+      run: find . -mindepth 1 -delete
+      working-directory: ${{ github.workspace }}
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: opencv/opencv-python
+        ref: ${{ env.VERSION }}
+        submodules: false
+        fetch-depth: 0
+    - name: Build a package
+      run: source scripts/build.sh
+    - name: Saving a wheel accordingly to matrix
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-aarch64-${{ matrix.with_contrib }}-${{ matrix.without_gui }}-${{ matrix.build_sdist }}
+        path: wheelhouse/opencv*.whl
+
+  build_loongarch64_wheels:
+    name: Build loongarch64 with_contrib ${{ matrix.with_contrib }} without_gui ${{ matrix.without_gui }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        platform: [x64]
+        with_contrib: [0, 1]
+        without_gui: [0, 1]
+        build_sdist: [0]
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      REPO_DIR: .
+      PROJECT_SPEC: opencv-python
+      MB_PYTHON_VERSION: ${{ matrix.python-version }}
+      TRAVIS_PYTHON_VERSION: ${{ matrix.python-version }}
+      MB_ML_VER: _2_38
+      TRAVIS_BUILD_DIR: ${{ github.workspace }}
+      CONFIG_PATH: travis_config.sh
+      DOCKER_IMAGE: ghcr.io/loong64/opencv-python-manylinux_2_38-loongarch64:${{ github.event.inputs.image_version }}
+      USE_CCACHE: 0
+      UNICODE_WIDTH: 32
+      PLAT: loongarch64
+      SDIST: ${{ matrix.build_sdist || 0 }}
+      ENABLE_HEADLESS: ${{ matrix.without_gui }}
+      ENABLE_CONTRIB: ${{ matrix.with_contrib }}
+      VERSION: ${{ github.event.inputs.tag }}
+    steps:
+    - name: Cleanup
+      run: find . -mindepth 1 -delete
+      working-directory: ${{ github.workspace }}
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: opencv/opencv-python
+        ref: ${{ env.VERSION }}
+        submodules: false
+        fetch-depth: 0
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Build a package
+      run: source scripts/build.sh
+      env:
+        DOCKER_DEFAULT_PLATFORM: linux/loong64
+    - name: Saving a wheel accordingly to matrix
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-loongarch64-${{ matrix.with_contrib }}-${{ matrix.without_gui }}-${{ matrix.build_sdist }}
+        path: wheelhouse/opencv*.whl
+
+  build_ppc64le_wheels:
+    name: Build ppc64le with_contrib ${{ matrix.with_contrib }} without_gui ${{ matrix.without_gui }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        platform: [x64]
+        with_contrib: [0, 1]
+        without_gui: [0, 1]
+        build_sdist: [0]
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      REPO_DIR: .
+      PROJECT_SPEC: opencv-python
+      MB_PYTHON_VERSION: ${{ matrix.python-version }}
+      TRAVIS_PYTHON_VERSION: ${{ matrix.python-version }}
+      MB_ML_VER: 2014
+      TRAVIS_BUILD_DIR: ${{ github.workspace }}
+      CONFIG_PATH: travis_config.sh
+      DOCKER_IMAGE: ghcr.io/loong64/opencv-python-manylinux_2014-ppc64le:${{ github.event.inputs.image_version }}
+      USE_CCACHE: 0
+      UNICODE_WIDTH: 32
+      PLAT: ppc64le
+      SDIST: ${{ matrix.build_sdist || 0 }}
+      ENABLE_HEADLESS: ${{ matrix.without_gui }}
+      ENABLE_CONTRIB: ${{ matrix.with_contrib }}
+      VERSION: ${{ github.event.inputs.tag }}
+    steps:
+    - name: Cleanup
+      run: find . -mindepth 1 -delete
+      working-directory: ${{ github.workspace }}
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: opencv/opencv-python
+        ref: ${{ env.VERSION }}
+        submodules: false
+        fetch-depth: 0
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Build a package
+      run: source scripts/build.sh
+      env:
+        DOCKER_DEFAULT_PLATFORM: linux/ppc64le
+    - name: Saving a wheel accordingly to matrix
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-ppc64le-${{ matrix.with_contrib }}-${{ matrix.without_gui }}-${{ matrix.build_sdist }}
+        path: wheelhouse/opencv*.whl
+
+  build_s390x_wheels:
+    name: Build s390x with_contrib ${{ matrix.with_contrib }} without_gui ${{ matrix.without_gui }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        platform: [x64]
+        with_contrib: [0, 1]
+        without_gui: [0, 1]
+        build_sdist: [0]
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      REPO_DIR: .
+      PROJECT_SPEC: opencv-python
+      MB_PYTHON_VERSION: ${{ matrix.python-version }}
+      TRAVIS_PYTHON_VERSION: ${{ matrix.python-version }}
+      MB_ML_VER: 2014
+      TRAVIS_BUILD_DIR: ${{ github.workspace }}
+      CONFIG_PATH: travis_config.sh
+      DOCKER_IMAGE: ghcr.io/loong64/opencv-python-manylinux_2014-s390x:${{ github.event.inputs.image_version }}
+      USE_CCACHE: 0
+      UNICODE_WIDTH: 32
+      PLAT: s390x
+      SDIST: ${{ matrix.build_sdist || 0 }}
+      ENABLE_HEADLESS: ${{ matrix.without_gui }}
+      ENABLE_CONTRIB: ${{ matrix.with_contrib }}
+      VERSION: ${{ github.event.inputs.tag }}
+    steps:
+    - name: Cleanup
+      run: find . -mindepth 1 -delete
+      working-directory: ${{ github.workspace }}
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: opencv/opencv-python
+        ref: ${{ env.VERSION }}
+        submodules: false
+        fetch-depth: 0
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Build a package
+      run: source scripts/build.sh
+      env:
+        DOCKER_DEFAULT_PLATFORM: linux/s390x
+    - name: Saving a wheel accordingly to matrix
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-s390x-${{ matrix.with_contrib }}-${{ matrix.without_gui }}-${{ matrix.build_sdist }}
+        path: wheelhouse/opencv*.whl
+
+  build_x86-64_wheels:
+    name: Build x86-64 with_contrib ${{ matrix.with_contrib }} without_gui ${{ matrix.without_gui }}
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        platform: [x64]
+        with_contrib: [0, 1]
+        without_gui: [0, 1]
+        build_sdist: [0]
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      REPO_DIR: .
+      PROJECT_SPEC: opencv-python
+      MB_PYTHON_VERSION: ${{ matrix.python-version }}
+      TRAVIS_PYTHON_VERSION: ${{ matrix.python-version }}
+      MB_ML_VER: 2014
+      TRAVIS_BUILD_DIR: ${{ github.workspace }}
+      CONFIG_PATH: travis_config.sh
+      DOCKER_IMAGE: quay.io/opencv-ci/opencv-python-manylinux2014-x86_64:${{ github.event.inputs.image_version }}
+      USE_CCACHE: 0
+      UNICODE_WIDTH: 32
+      PLAT: x86_64
+      SDIST: ${{ matrix.build_sdist || 0 }}
+      ENABLE_HEADLESS: ${{ matrix.without_gui }}
+      ENABLE_CONTRIB: ${{ matrix.with_contrib }}
+      VERSION: ${{ github.event.inputs.tag }}
+    steps:
+    - name: Cleanup
+      run: find . -mindepth 1 -delete
+      working-directory: ${{ github.workspace }}
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: opencv/opencv-python
+        ref: ${{ env.VERSION }}
+        submodules: false
+        fetch-depth: 0
+    - name: Build a package
+      run: source scripts/build.sh
+    - name: Saving a wheel accordingly to matrix
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-x86-64-${{ matrix.with_contrib }}-${{ matrix.without_gui }}-${{ matrix.build_sdist }}
+        path: wheelhouse/opencv*.whl
+
+  upload_wheels:
+    runs-on: ubuntu-22.04
+    needs: [build_loongarch64_wheels, build_ppc64le_wheels, build_s390x_wheels]
+    env:
+      version: ${{ github.event.inputs.tag }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: wheelhouse/
+          merge-multiple: true
+      - name: Upload wheels
+        run: |
+          ls -al wheelhouse/
+          pip install twine==6.0.1
+          for file in wheelhouse/*.whl; do
+            twine upload --repository-url https://gitlab.com/api/v4/projects/65746188/packages/pypi $file || true
+          done
+        env:
+          TWINE_USERNAME: ${{ github.repository_owner }}
+          TWINE_PASSWORD: ${{ secrets.GL_TOKEN }}
+
+      - name: Upload release
+        run: |
+          gh release upload ${{ env.version }} -R ${{ github.repository }} wheelhouse/*.whl --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

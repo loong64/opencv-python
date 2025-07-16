@@ -1,0 +1,159 @@
+name: Build manywheel docker images (custom)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Build with specific tag'
+        required: false
+        default: ''
+
+jobs:
+  check_version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check_version.outputs.version }}
+    steps:
+      - name: Check version
+        id: check_version
+        run: |
+          if [ -z "${{ github.event.inputs.tag }}" ]; then
+            echo "No tag provided, using latest release"
+            version=$(curl -s "https://api.github.com/repos/opencv/opencv-python/releases/latest" | jq -r .tag_name)
+          else
+            version=${{ github.event.inputs.tag }}
+          fi
+
+          if [ -z "${version}" ] || [ "${version}" == "null" ]; then
+            echo "Failed to get version"
+            exit 1
+          fi
+
+          echo "version=${version}" >> $GITHUB_ENV
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "========== Build Args =========="
+          echo "opencv-python version: ${version}"
+
+  build_loongarch64_manylinux:
+    name: Build image for loongarch64
+    runs-on: ubuntu-latest
+    needs: check_version
+    env:
+      version: ${{ needs.check_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Generate files
+        run: |
+          mkdir -p docker/manylinux_2_38
+          wget -qO docker/manylinux_2_38/Dockerfile_loongarch64 https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_x86_64
+          patch -p1 < loong64.patch
+          cd docker/manylinux_2_38
+          sed -i "s@FROM quay.io/pypa/manylinux2014_x86_64@FROM ghcr.io/loong64/manylinux_2_38_loongarch64@g" Dockerfile_loongarch64
+          image_tag=$(cat Dockerfile_loongarch64 | grep "Version:" | sed 's/# Version: //')
+          echo "image_tag=${image_tag}" >> $GITHUB_ENV
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/manylinux_2_38/Dockerfile_loongarch64
+          platforms: linux/loong64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux_2_38-loongarch64:${{ env.image_tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux_2_38-loongarch64:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux_2_38-loongarch64:buildcache,mode=max
+
+  build_ppc64le_manylinux:
+    name: Build image for ppc64le
+    runs-on: ubuntu-latest
+    needs: check_version
+    env:
+      version: ${{ needs.check_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Generate files
+        run: |
+          mkdir -p docker/manylinux2014
+          wget -qO docker/manylinux2014/Dockerfile_ppc64le https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_x86_64
+          patch -p1 < ppc64le.patch
+          cd docker/manylinux2014
+          sed -i "s@FROM quay.io/pypa/manylinux2014_x86_64@FROM quay.io/pypa/manylinux2014_ppc64le@g" Dockerfile_ppc64le
+          image_tag=$(cat Dockerfile_ppc64le | grep "Version:" | sed 's/# Version: //')
+          echo "image_tag=${image_tag}" >> $GITHUB_ENV
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/manylinux2014/Dockerfile_ppc64le
+          platforms: linux/ppc64le
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux2014-ppc64le:${{ env.image_tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux2014-ppc64le:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux2014-ppc64le:buildcache,mode=max
+
+  build_s390x_manylinux:
+    name: Build image for s390x
+    runs-on: ubuntu-latest
+    needs: check_version
+    env:
+      version: ${{ needs.check_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Generate files
+        run: |
+          mkdir -p docker/manylinux2014
+          wget -qO docker/manylinux2014/Dockerfile_s390x https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_x86_64
+          patch -p1 < s390x.patch
+          cd docker/manylinux2014
+          sed -i "s@FROM quay.io/pypa/manylinux2014_x86_64@FROM quay.io/pypa/manylinux2014_s390x@g" Dockerfile_s390x
+          image_tag=$(cat Dockerfile_s390x | grep "Version:" | sed 's/# Version: //')
+          echo "image_tag=${image_tag}" >> $GITHUB_ENV
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/manylinux2014/Dockerfile_s390x
+          platforms: linux/s390x
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux2014-s390x:${{ env.image_tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux2014-s390x:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux2014-s390x:buildcache,mode=max
