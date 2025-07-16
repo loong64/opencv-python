@@ -1,0 +1,86 @@
+name: Build manywheel docker images
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 0 * * *
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check version
+        run: |
+          version=$(curl -s "https://api.github.com/repos/opencv/opencv-python/releases/latest" | jq -r .tag_name)
+          if [ -z "${version}" ] || [ "${version}" == "null" ]; then
+            echo "Failed to get version"
+            exit 1
+          fi
+
+          echo "version=${version}" >> $GITHUB_ENV
+          echo ""
+          echo "========== Build Args =========="
+          echo "opencv-python version: ${version}"
+
+      - name: Check release
+        run: |
+          gh release view ${version} -R ${{ github.repository }} >/dev/null 2>&1 || echo "build=1" >> $GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+        if: env.build == '1'
+      - uses: docker/setup-qemu-action@v3
+        if: env.build == '1'
+      - uses: docker/setup-buildx-action@v3
+        if: env.build == '1'
+
+      - name: Generate files
+        if: env.build == '1'
+        run: |
+          mkdir -p docker/manylinux_2_38
+          cd docker/manylinux_2_38
+          wget -qO Dockerfile_loongarch64 https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_aarch64
+          sed -i "s@quay.io/opencv-ci/opencv-python-manylinux2014-aarch64@ghcr.io/loong64/manylinux_2_38_loongarch64@g" Dockerfile_loongarch64
+          sed -i "s@cp /usr/include/lapacke@# cp /usr/include/lapacke@g" Dockerfile_loongarch64
+          sed -i 's/epel-release//g' Dockerfile_loongarch64
+
+          image_tag=$(cat Dockerfile_loongarch64 | grep "Version:" | sed 's/# Version: //')
+          echo "image_tag=${image_tag}" >> $GITHUB_ENV
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        if: env.build == '1'
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/manylinux_2_38
+          platforms: linux/loong64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux_2_38-loongarch64:${{ env.image_tag }}
+            ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux_2_38-loongarch64:latest
+          cache-from: ghcr.io/${{ github.repository_owner }}/opencv-python-manylinux_2_38-loongarch64:latest
+
+      - name: Create tag
+        if: env.build == '1'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update to ${version}" || true
+          git tag ${version} || true
+          git push origin ${version} || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: ${{ github.repository }}
+          tag_name: ${{ env.version }}
