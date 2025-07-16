@@ -28,7 +28,7 @@ jobs:
           echo "========== Build Args =========="
           echo "opencv-python version: ${version}"
 
-          gh release view ${version} -R ${{ github.repository }} | grep opencv.*.whl >/dev/null 2>&1 || echo "build=1" >> $GITHUB_ENV
+          gh release view ${version} -R ${{ github.repository }} | grep opencv.*.whl >/dev/null 2>&1 || echo "build=1" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -80,6 +80,8 @@ jobs:
       uses: docker/setup-qemu-action@v3
     - name: Build a package
       run: source scripts/build.sh
+      env:
+        DOCKER_DEFAULT_PLATFORM: linux/loong64
     - name: Saving a wheel accordingly to matrix
       uses: actions/upload-artifact@v4
       with:
@@ -98,10 +100,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: wheels
+          pattern: wheel-*
           path: wheelhouse/
+          merge-multiple: true
       - name: Upload wheels
         run: |
+          ls -al wheelhouse/
           pip install twine==6.0.1
           for file in wheelhouse/*.whl; do
             twine upload --repository-url https://gitlab.com/api/v4/projects/65746188/packages/pypi $file || true

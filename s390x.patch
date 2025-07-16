@@ -1,0 +1,22 @@
+diff --git a/docker/manylinux2014/Dockerfile_s390x b/docker/manylinux2014/Dockerfile_s390x
+index 088d8df..975e6d7 100644
+--- a/docker/manylinux2014/Dockerfile_s390x
++++ b/docker/manylinux2014/Dockerfile_s390x
+@@ -85,6 +85,8 @@ RUN mkdir ~/yasm_sources && \
+     curl -O -L http://www.tortall.net/projects/yasm/releases/yasm-${YASM_VERSION}.tar.gz && \
+     tar -xf yasm-${YASM_VERSION}.tar.gz && \
+     cd yasm-${YASM_VERSION} && \
++    curl -o config/config.sub -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.sub && \
++    curl -o config/config.guess -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.guess && \
+     ./configure --prefix="/ffmpeg_build" --bindir="$HOME/bin" && \
+     make -j$(getconf _NPROCESSORS_ONLN) && \
+     make install && \
+@@ -117,6 +119,8 @@ RUN mkdir ~/ffmpeg_sources && \
+ RUN curl -O -L https://github.com/ccache/ccache/releases/download/v${CCACHE_VERSION}/ccache-${CCACHE_VERSION}.tar.gz && \
+     tar -xf ccache-${CCACHE_VERSION}.tar.gz && \
+     cd ccache-${CCACHE_VERSION} && \
++    curl -O -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.sub && \
++    curl -O -L https://github.com/cgitmirror/config/raw/refs/heads/master/config.guess && \
+     ./configure && \
+     make -j$(getconf _NPROCESSORS_ONLN) && \
+     make install && \
