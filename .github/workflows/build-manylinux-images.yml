@@ -41,7 +41,7 @@ jobs:
         run: |
           mkdir -p docker/manylinux_2_38
           wget -qO docker/manylinux_2_38/Dockerfile_loongarch64 https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux_2_28/Dockerfile_x86_64
-          # patch -p1 < loong64.patch
+          patch -p1 < loong64.patch
           cd docker/manylinux_2_38
           sed -i "s@FROM quay.io/pypa/manylinux_2_28_x86_64@FROM ghcr.io/loong64/manylinux_2_38_loongarch64@g" Dockerfile_loongarch64
           sed -i "s@epel-release@anolis-epao-release@g" Dockerfile_loongarch64
