@@ -16,7 +16,7 @@ jobs:
       - name: Check version
         id: check_version
         run: |
-          version=$(curl -s "https://api.github.com/repos/opencv/opencv-python/releases/latest" | jq -r .tag_name)
+          version=$(curl --retry 10 -s "https://api.github.com/repos/opencv/opencv-python/releases/latest" | jq -r .tag_name)
           if [ -z "${version}" ] || [ "${version}" == "null" ]; then
             echo "Failed to get version"
             exit 1
@@ -44,23 +44,28 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.9']
-        platform: [x64]
+        platform: [loongarch64]
+        manylinux: [2_38]
         with_contrib: [0, 1]
         without_gui: [0, 1]
         build_sdist: [0]
+        include:
+          - platform: loongarch64
+            manylinux: 2_38
+            DOCKER_IMAGE: ghcr.io/loong64/opencv-python-manylinux_2_38-loongarch64:latest
     env:
       ACTIONS_ALLOW_UNSECURE_COMMANDS: true
       REPO_DIR: .
       PROJECT_SPEC: opencv-python
       MB_PYTHON_VERSION: ${{ matrix.python-version }}
       TRAVIS_PYTHON_VERSION: ${{ matrix.python-version }}
-      MB_ML_VER: _2_38
+      MB_ML_VER: ${{ matrix.manylinux }}
       TRAVIS_BUILD_DIR: ${{ github.workspace }}
       CONFIG_PATH: travis_config.sh
-      DOCKER_IMAGE: ghcr.io/loong64/opencv-python-manylinux_2_38-loongarch64:latest
+      DOCKER_IMAGE: ${{ matrix.DOCKER_IMAGE }}
       USE_CCACHE: 0
       UNICODE_WIDTH: 32
-      PLAT: loongarch64
+      PLAT: ${{ matrix.platform }}
       SDIST: ${{ matrix.build_sdist || 0 }}
       ENABLE_HEADLESS: ${{ matrix.without_gui }}
       ENABLE_CONTRIB: ${{ matrix.with_contrib }}
@@ -70,20 +75,35 @@ jobs:
       run: find . -mindepth 1 -delete
       working-directory: ${{ github.workspace }}
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
       with:
         repository: opencv/opencv-python
         ref: ${{ env.VERSION }}
-        submodules: false
+        submodules: true
         fetch-depth: 0
     - name: Setup QEMU
-      uses: docker/setup-qemu-action@v3
+      uses: docker/setup-qemu-action@v4
+    - name: Prepare build
+      run: |
+        cd opencv/3rdparty/mlas/lib/loongarch64/
+        if [ ! -f "FgemmKernelCommon.h" ]; then
+          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/FgemmKernelCommon.h
+        fi
+        if [ ! -f "FgemmKernelLsxCommon.h" ]; then
+          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/FgemmKernelLsxCommon.h
+        fi
+        if [ ! -f "FgemmKernelLasxCommon.h" ]; then
+          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/FgemmKernelLasxCommon.h
+        fi
+        if [ ! -f "SgemmKernelCommon.h" ]; then
+          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/SgemmKernelCommon.h
+        fi
     - name: Build a package
       run: source scripts/build.sh
       env:
         DOCKER_DEFAULT_PLATFORM: linux/loong64
     - name: Saving a wheel accordingly to matrix
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: wheel-${{ matrix.with_contrib }}-${{ matrix.without_gui }}-${{ matrix.build_sdist }}
         path: wheelhouse/opencv*.whl
@@ -98,7 +118,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: wheel-*
           path: wheelhouse/

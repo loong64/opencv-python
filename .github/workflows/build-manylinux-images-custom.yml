@@ -93,7 +93,6 @@ jobs:
         run: |
           mkdir -p docker/manylinux2014
           wget -qO docker/manylinux2014/Dockerfile_ppc64le https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_x86_64
-          patch -p1 < ppc64le.patch
           cd docker/manylinux2014
           sed -i "s@FROM quay.io/pypa/manylinux2014_x86_64@FROM quay.io/pypa/manylinux2014_ppc64le@g" Dockerfile_ppc64le
           image_tag=$(cat Dockerfile_ppc64le | grep "Version:" | sed 's/# Version: //')
@@ -133,7 +132,6 @@ jobs:
         run: |
           mkdir -p docker/manylinux2014
           wget -qO docker/manylinux2014/Dockerfile_s390x https://github.com/opencv/opencv-python/raw/refs/tags/${version}/docker/manylinux2014/Dockerfile_x86_64
-          patch -p1 < s390x.patch
           cd docker/manylinux2014
           sed -i "s@FROM quay.io/pypa/manylinux2014_x86_64@FROM quay.io/pypa/manylinux2014_s390x@g" Dockerfile_s390x
           image_tag=$(cat Dockerfile_s390x | grep "Version:" | sed 's/# Version: //')
