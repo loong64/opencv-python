@@ -96,21 +96,6 @@ jobs:
         fetch-depth: 0
     - name: Setup QEMU
       uses: docker/setup-qemu-action@v4
-    - name: Prepare build
-      run: |
-        cd opencv/3rdparty/mlas/lib/loongarch64/
-        if [ ! -f "FgemmKernelCommon.h" ]; then
-          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/FgemmKernelCommon.h
-        fi
-        if [ ! -f "FgemmKernelLsxCommon.h" ]; then
-          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/FgemmKernelLsxCommon.h
-        fi
-        if [ ! -f "FgemmKernelLasxCommon.h" ]; then
-          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/FgemmKernelLasxCommon.h
-        fi
-        if [ ! -f "SgemmKernelCommon.h" ]; then
-          wget https://github.com/microsoft/onnxruntime/raw/refs/heads/main/onnxruntime/core/mlas/lib/loongarch64/SgemmKernelCommon.h
-        fi
     - name: Build a package
       run: source scripts/build.sh
       env:
