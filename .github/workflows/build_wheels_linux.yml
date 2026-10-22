@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
+    inputs:
+      version:
+        default: 'latest'
+        description: 'Package version'
+        type: string
+        required: true
 
 
 jobs:
@@ -16,7 +22,14 @@ jobs:
       - name: Check version
         id: check_version
         run: |
-          version=$(curl --retry 10 -s "https://api.github.com/repos/opencv/opencv-python/releases/latest" | jq -r .tag_name)
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            version="latest"
+          else
+            version=${{ github.event.inputs.version }}
+          fi
+          if [ "$version" = "latest" ]; then
+            version=$(curl --retry 10 -s "https://api.github.com/repos/opencv/opencv-python/releases/latest" | jq -r .tag_name)
+          fi
           if [ -z "${version}" ] || [ "${version}" == "null" ]; then
             echo "Failed to get version"
             exit 1
