@@ -132,8 +132,9 @@ jobs:
           TWINE_USERNAME: ${{ github.repository_owner }}
           TWINE_PASSWORD: ${{ secrets.GL_TOKEN }}
 
-      - name: Upload release
-        run: |
-          gh release upload ${{ env.VERSION }} -R ${{ github.repository }} wheelhouse/*.whl --clobber
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release
+        if: env.build == '1'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: ${{ github.repository }}
+          tag_name: ${{ env.version }}
